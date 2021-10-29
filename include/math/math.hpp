@@ -6,6 +6,8 @@
 
 namespace math
 {
+
+    
     void testPrint()
     {
         std::cout << "math.hpp works!" << std::endl;

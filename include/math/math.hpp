@@ -70,6 +70,9 @@ namespace math
             }            
     }
     
-
+    int applyCombFilter()
+    {
+        return 0;
+    }
     
 }

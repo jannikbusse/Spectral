@@ -10,15 +10,21 @@
 #define NUM_POINTS 128
 #define SAMPLE_DURATION 0.01
 
+#define NUMBER_OF_FRAMES 100
+
 using namespace std;
 
 #define REAL 0
 #define IMAG 1
 
 float sampleFreq = NUM_POINTS / SAMPLE_DURATION;
-float *magnitudes = (float*) malloc(sizeof(float) * NUM_POINTS/2);
-
+float magnitudes[6][NUMBER_OF_FRAMES];
+float magDifferentials[6][NUMBER_OF_FRAMES];
 float scaledFreqBand[6][2];
+
+int magBufferIdx = 0;
+int bufferMisses = 0;
+
 
 void acquire_from_somewhere(fftw_complex* signal) {
     /* Generate two sine waves of different frequencies and
@@ -40,14 +46,16 @@ void do_something_with(fftw_complex* result) {
     float frequencydelta  = sampleFreq / NUM_POINTS;
 
     math::getScaledFrequencyBands(result, scaledFreqBand);
-    scaledFreqBand[6][REAL] = 5;
+
 
 
     for (int i = 0; i < 6; i++) {
         float mag = sqrt(scaledFreqBand[i][REAL] * scaledFreqBand[i][REAL] +
                           scaledFreqBand[i][IMAG] * scaledFreqBand[i][IMAG]);
 
-        magnitudes[i] = mag;
+        magnitudes[i][magBufferIdx] = mag;
+        magDifferentials[i][magBufferIdx] = magnitudes[i][magBufferIdx] - magnitudes[i][(magBufferIdx + NUMBER_OF_FRAMES-1)%NUMBER_OF_FRAMES];
+
     }
     //math::normBuffer(magnitudes, NUM_POINTS/2);
     std::system("clear");
@@ -57,7 +65,7 @@ void do_something_with(fftw_complex* result) {
        
         out = to_string((int)(frequencydelta *     pow(2,i+1)))  ;
         //out = out + " " + to_string(magnitudes[i]);
-        for(int a = 0; a < log10(magnitudes[i]) * 5; a ++)
+        for(int a = 0; a < log10(magnitudes[i][magBufferIdx]) * 5; a ++)
         {
             out =  out + "#";
         }
@@ -65,6 +73,30 @@ void do_something_with(fftw_complex* result) {
 
     }
     cout << "frequency max: " << (sampleFreq/2) << endl;
+    cout << "BufferMisses: " << bufferMisses << endl;
+    cout << "\nmagnitude differentials:" << endl;
+    for (int i = 0; i < 6; i++) {
+        string out = "";
+       
+        out = to_string((int)(frequencydelta *     pow(2,i+1)))  ;
+        //out = out + " " + to_string(magnitudes[i]);
+        for(int a = 0; a < (log10(magDifferentials[i][magBufferIdx])) * 5; a ++)
+        {
+            out =  out + "#";
+        }
+        cout << out << endl;
+
+    }
+
+    string beatDetected = "";
+    if(magDifferentials[2][magBufferIdx] > 5.8f)
+        beatDetected = "O";
+    
+    cout << "beat detected: " << beatDetected << endl;
+
+
+
+    magBufferIdx = (magBufferIdx +1 ) % NUMBER_OF_FRAMES;
 
 }
 
@@ -84,12 +116,10 @@ int startMicRoutine()
     {
         signal[i][IMAG] = 0;
     }
-
     while(1){
-        Pa_Sleep(1);
+        Pa_Sleep(2);
         if (!readCurrentBuffer(buffer))
         {
-            
             fftw_plan plan = fftw_plan_dft_1d(NUM_POINTS,
                                             signal,
                                             result,
@@ -103,9 +133,11 @@ int startMicRoutine()
             fftw_execute(plan);
             do_something_with(result);
             fftw_destroy_plan(plan);
+            bufferMisses = 0;
 
         }
-        //cout << "buffer miss" << endl;
+        else 
+            bufferMisses ++;
 
     }
     
@@ -114,7 +146,9 @@ int startMicRoutine()
 }
 
 
-int main() {
+int main()
+    {
+
     startMicRoutine();   
 
     fftw_complex signal[NUM_POINTS];

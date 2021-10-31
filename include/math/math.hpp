@@ -7,9 +7,19 @@
 namespace math
 {
 
-    
-    void testPrint()
+    float getPeakAmplitude(float* signal, int bufferSize)
     {
-        std::cout << "math.hpp works!" << std::endl;
+        float peak = 0;
+        for(int i = 0; i < bufferSize; i ++)
+        {
+            if(abs(signal[i]) > peak)
+            {
+                peak = abs(signal[i]);
+            }
+        }
+        return peak;
     }
+    
+
+    
 }

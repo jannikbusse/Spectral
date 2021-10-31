@@ -2,6 +2,8 @@
 #include <fftw3.h>
 #include <iostream>
 #include <utils/microphone.hpp>
+#include <math/math.hpp>
+#include <string.h>
 
 #define NUM_POINTS 512
 #define SAMPLE_DURATION 3.14
@@ -53,8 +55,28 @@ void do_something_with(fftw_complex* result) {
 
 /* Resume reading here */
 
+using namespace std;
+
 int main() {
-    psudomain();
+    float* buffer = (float*) malloc(sizeof(float) * 512);
+    initMicrophone();
+    while(1){
+        Pa_Sleep(2);
+        if (!readCurrentBuffer(buffer))
+        {
+            float peak = math::getPeakAmplitude(buffer, 512) * 20;
+            string out = "";
+            for(int i = 0; i < peak; i ++)
+            {
+                out = out + "#";
+            }
+            std::system("clear");
+            cout << out << endl;
+
+
+        }
+    }
+    releaseMicrophone();
     exit(0);
 
     fftw_complex signal[NUM_POINTS];

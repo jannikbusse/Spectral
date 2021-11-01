@@ -163,7 +163,15 @@
         }
         unsigned long availableData =  Pa_GetStreamReadAvailable(stream);
         if(availableData >= FRAMES_PER_BUFFER)
-            err = Pa_ReadStream(stream, buffer,FRAMES_PER_BUFFER);
+        {
+            std::cout <<"buffer: " << Pa_GetStreamReadAvailable(stream) << std::endl;
+
+           
+            while(Pa_GetStreamReadAvailable(stream)>= FRAMES_PER_BUFFER )
+                 err = Pa_ReadStream(stream, buffer,FRAMES_PER_BUFFER);
+            
+
+        }
         else
             return 1;
            

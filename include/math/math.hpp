@@ -37,37 +37,34 @@ namespace math
         }
     }
 
-    void getScaledFrequencyBands(fftw_complex rawSignal[], float (&sequencyBands)[6][2])
+    void getScaledFrequencyBands(float rawSignal[], float (&sequencyBands)[6])
     {
-        //this will be hardcoded for 32 size input and 6 size output.. this should be implemented better
+        //this will be hardcoded for 64 size input and 6 size output.. this should be implemented better
         //the deltafrequency is 100 with these values (which is nice)
-            for(int a = 0; a < 2; a++)
-                {
-                sequencyBands[0][a] = 0;
-                for(int i = 0; i <2; i++){
-                    sequencyBands[0][a] += rawSignal[i][a];
-                }
-                sequencyBands[1][a] = 0;
-                for(int i = 2; i <4; i++){
-                    sequencyBands[1][a] += rawSignal[i][a];
-                }
-                sequencyBands[2][a] = 0;
-                for(int i = 4; i <8; i++){
-                    sequencyBands[2][a] += rawSignal[i][a];
-                }
-                sequencyBands[3][a] = 0;
-                for(int i = 8; i <16; i++){
-                    sequencyBands[3][a] += rawSignal[i][a];
-                }
-                sequencyBands[4][a] = 0;
-                for(int i = 16; i <32; i++){
-                    sequencyBands[4][a] += rawSignal[i][a];
-                }
-                sequencyBands[5][a] = 0;
-                for(int i = 32; i <50; i++){
-                    sequencyBands[5][a] += rawSignal[i][a];
-                }
-            }            
+        sequencyBands[0] = 0;
+        for(int i = 0; i <2; i++){
+            sequencyBands[0] += rawSignal[i];
+        }
+        sequencyBands[1] = 0;
+        for(int i = 2; i <4; i++){
+            sequencyBands[1] += rawSignal[i];
+        }
+        sequencyBands[2] = 0;
+        for(int i = 4; i <8; i++){
+            sequencyBands[2] += rawSignal[i];
+        }
+        sequencyBands[3] = 0;
+        for(int i = 8; i <16; i++){
+            sequencyBands[3] += rawSignal[i];
+        }
+        sequencyBands[4] = 0;
+        for(int i = 16; i <32; i++){
+            sequencyBands[4] += rawSignal[i];
+        }
+        sequencyBands[5] = 0;
+        for(int i = 32; i <64; i++){
+            sequencyBands[5] += rawSignal[i];
+        }
     }
     
     int applyCombFilter()

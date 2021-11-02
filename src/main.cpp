@@ -38,15 +38,19 @@ float rollingMagnitude[NUM_POINTS/2];
 
 float frequencydelta  = sampleFreq / NUM_POINTS;
 
-
+//the buffer index for the ringbuffers
 int magBufferIdx = 0;
+
+//just and counter that counted how often there were not enough audiosamples when accessed. It is no longer required.
 int bufferMisses = 0;
 
 
+/**
+ * @brief This method can be used to generate debug signals. Otherwise it has no purpose
+ * 
+ * @param signal the signal buffer
+ */
 void acquire_from_somewhere(float* signal) {
-    /* Generate two sine waves of different frequencies and
-     * amplitudes.
-     */
 
     int i;
     for (i = 0; i < NUM_POINTS; i++) {
@@ -94,56 +98,14 @@ int detectSignalOnset(int frequencyBin)
 
 }
 
-void do_something_with(fftwf_complex* result)
+void processResults(fftwf_complex* result)
 {
 
-    if(OUTPUT_ENABLED)
-        std::system("clear");
-
-    for(int i = 0; i < NUM_POINTS / 2; i += 1)
-    {   
-        float mag = sqrt(result[i][REAL] * result[i][REAL] + result[i][IMAG] * result[i][IMAG]);
-
-        unprocessedMagnitudes[i] = mag * 0.8f + rollingMagnitudeDifferential[i] * 0.2f;
-        rollingMagnitudeDifferential[i] = unprocessedMagnitudes[i];
-        string out = to_string((int)(frequencydelta *   i));
-        for(int a = 0; a < (unprocessedMagnitudes[i]) * 15; a ++)
-        {
-            out = out + "#";
-        }
-        // if(OUTPUT_ENABLED)
-        //     cout << out << endl;
-    }
-    suppressNoiseAmp(unprocessedMagnitudes);
     
-   
-    math::getScaledFrequencyBands(unprocessedMagnitudes, scaledFreqBand);
-
-    for(int bin = 0; bin < 6; bin ++)
-    {
-        magnitudes[bin][magBufferIdx] = scaledFreqBand[bin];
-        float magDiff = scaledFreqBand[bin] - (magnitudes[bin][(magBufferIdx - 1 + NUMBER_OF_FRAMES)%NUMBER_OF_FRAMES]);
-        magDifferentials[bin][magBufferIdx] = magDiff;
-
-
-
-        string out = to_string((int)(frequencydelta *     pow(2,bin+1)));
-        for(int i = 0; i < magnitudes[bin][magBufferIdx]; i ++)
-        {
-            out = out + "#";
-        }
-        cout << out << endl;
-    }
-    if(OUTPUT_ENABLED)
-        cout << bufferMisses << endl;
-
 
     magBufferIdx = (magBufferIdx +1 ) % NUMBER_OF_FRAMES;
 
 }
-
-
-/* Resume reading here */
 
 
 int startMicRoutine()
@@ -173,7 +135,7 @@ int startMicRoutine()
             }
             //acquire_from_somewhere(signal);
             fftwf_execute(plan);
-            do_something_with(result);
+            processResults(result);
             fftwf_destroy_plan(plan);
             bufferMisses = 0;
 

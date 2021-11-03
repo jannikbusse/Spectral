@@ -20,6 +20,9 @@ add_executable("${PROJECT_NAME}"
 
 add_definitions(-DPROJ_DIR=\"${PROJECT_SOURCE_DIR}\")
 #install(TARGETS "${PROJECT_NAME}" DESTINATION bin)
+target_link_libraries("${PROJECT_NAME}"  boost_iostreams)
+target_link_libraries("${PROJECT_NAME}"  boost_system)
+target_link_libraries("${PROJECT_NAME}"  boost_filesystem)
 target_link_libraries("${PROJECT_NAME}"  Threads::Threads)
 target_link_libraries("${PROJECT_NAME}" OpenMP::OpenMP_CXX)
 target_link_libraries("${PROJECT_NAME}" fftw3f)

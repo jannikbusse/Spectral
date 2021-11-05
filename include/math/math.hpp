@@ -8,10 +8,10 @@
 namespace math
 {
 
-    float SAMPLE_POINTS = 1024;
-    float SAMPLE_TIME = 0.02;
-    float SAMPLE_FREQUENCY = SAMPLE_POINTS / SAMPLE_TIME;
-    float FREQUENCY_DELTA = SAMPLE_FREQUENCY / SAMPLE_POINTS;
+    // float SAMPLE_POINTS = 1024;
+    // float SAMPLE_TIME = 0.015;
+    // float SAMPLE_FREQUENCY = SAMPLE_POINTS / SAMPLE_TIME;
+    // float FREQUENCY_DELTA = SAMPLE_FREQUENCY / SAMPLE_POINTS;
 
     float getPeakAmplitude(const float* signal, int bufferSize)
     {
@@ -42,7 +42,7 @@ namespace math
         }
     }
 
-    void getScaledFrequencyBands(float rawSignal[], float (&sequencyBands)[6])
+    void getScaledFrequencyBands(float rawSignal[], float (&sequencyBands)[6], float FREQUENCY_DELTA)
     {
         //this will be hardcoded for 512 size input and 6 size output.. this should be implemented better while having 0.04 sec time window
         //0 - 200
@@ -51,31 +51,32 @@ namespace math
         //800 - 1600
         //1600 - 3200
         //3200 - Rest
+        std::cout <<" freq delta scaled" << FREQUENCY_DELTA << std::endl;
 
 
 
         sequencyBands[0] = 0;
-        for(int i = 1; i < 200/FREQUENCY_DELTA; i++){
+        for(int i = 1; i < 200.0/FREQUENCY_DELTA; i++){
             sequencyBands[0] += rawSignal[i];
         }
         sequencyBands[1] = 0;
-        for(int i = 200/FREQUENCY_DELTA; i <400/FREQUENCY_DELTA; i++){
+        for(int i = 200.0/FREQUENCY_DELTA; i <400.0/FREQUENCY_DELTA; i++){
             sequencyBands[1] += rawSignal[i];
         }
         sequencyBands[2] = 0;
-        for(int i = 400/FREQUENCY_DELTA; i <800/FREQUENCY_DELTA; i++){
+        for(int i = 400.0/FREQUENCY_DELTA; i <800.0/FREQUENCY_DELTA; i++){
             sequencyBands[2] += rawSignal[i];
         }
         sequencyBands[3] = 0;
-        for(int i = 800/FREQUENCY_DELTA; i <1600/FREQUENCY_DELTA; i++){
+        for(int i = 800.0/FREQUENCY_DELTA; i <1600.0/FREQUENCY_DELTA; i++){
             sequencyBands[3] += rawSignal[i];
         }
         sequencyBands[4] = 0;
-        for(int i = 1600/FREQUENCY_DELTA; i <3200/FREQUENCY_DELTA; i++){
+        for(int i = 1600.0/FREQUENCY_DELTA; i <3200.0/FREQUENCY_DELTA; i++){
             sequencyBands[4] += rawSignal[i];
         }
         sequencyBands[5] = 0;
-        for(int i = 3200/FREQUENCY_DELTA; i <SAMPLE_POINTS/2; i++){
+        for(int i = 3200.0/FREQUENCY_DELTA; i <5000.0/FREQUENCY_DELTA; i++){
             sequencyBands[5] += rawSignal[i];
         }
     }

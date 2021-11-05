@@ -8,6 +8,11 @@
 namespace math
 {
 
+    float SAMPLE_POINTS = 1024;
+    float SAMPLE_TIME = 0.02;
+    float SAMPLE_FREQUENCY = SAMPLE_POINTS / SAMPLE_TIME;
+    float FREQUENCY_DELTA = SAMPLE_FREQUENCY / SAMPLE_POINTS;
+
     float getPeakAmplitude(const float* signal, int bufferSize)
     {
         float peak = 0;
@@ -39,32 +44,45 @@ namespace math
 
     void getScaledFrequencyBands(float rawSignal[], float (&sequencyBands)[6])
     {
-        //this will be hardcoded for 64 size input and 6 size output.. this should be implemented better
-        //the deltafrequency is 100 with these values (which is nice)
+        //this will be hardcoded for 512 size input and 6 size output.. this should be implemented better while having 0.04 sec time window
+        //0 - 200
+        //200 - 400
+        //400 - 800
+        //800 - 1600
+        //1600 - 3200
+        //3200 - Rest
+
+
+
         sequencyBands[0] = 0;
-        for(int i = 0; i <2; i++){
+        for(int i = 1; i < 200/FREQUENCY_DELTA; i++){
             sequencyBands[0] += rawSignal[i];
         }
         sequencyBands[1] = 0;
-        for(int i = 2; i <4; i++){
+        for(int i = 200/FREQUENCY_DELTA; i <400/FREQUENCY_DELTA; i++){
             sequencyBands[1] += rawSignal[i];
         }
         sequencyBands[2] = 0;
-        for(int i = 4; i <8; i++){
+        for(int i = 400/FREQUENCY_DELTA; i <800/FREQUENCY_DELTA; i++){
             sequencyBands[2] += rawSignal[i];
         }
         sequencyBands[3] = 0;
-        for(int i = 8; i <16; i++){
+        for(int i = 800/FREQUENCY_DELTA; i <1600/FREQUENCY_DELTA; i++){
             sequencyBands[3] += rawSignal[i];
         }
         sequencyBands[4] = 0;
-        for(int i = 16; i <32; i++){
+        for(int i = 1600/FREQUENCY_DELTA; i <3200/FREQUENCY_DELTA; i++){
             sequencyBands[4] += rawSignal[i];
         }
         sequencyBands[5] = 0;
-        for(int i = 32; i <64; i++){
+        for(int i = 3200/FREQUENCY_DELTA; i <SAMPLE_POINTS/2; i++){
             sequencyBands[5] += rawSignal[i];
         }
+    }
+
+    float applyHanningFunction(int curId, int maxId)
+    {
+        return 0.5f * ( 1 - cos((2* M_PI * (float) curId)/((float)maxId - 1.0f)));
     }
     
     int applyCombFilter()

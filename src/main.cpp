@@ -17,18 +17,22 @@
 #include "gnuplot-iostream.h"
 
 #define OUTPUT_ENABLED 1
-#define NUM_POINTS 128
-#define SAMPLE_DURATION 0.05
-#define NUMBER_OF_FRAMES 500
-#define MINIMAL_SIGNAL_THRESHOLD 0.05 //this is the threshold for the noise reduction
+#define NUM_POINTS 1024
+#define SAMPLE_DURATION 0.02
+#define NUMBER_OF_FRAMES 1000
+#define MINIMAL_SIGNAL_THRESHOLD 0.01 //this is the threshold for the noise reduction
 #define NUMBER_OF_COMBFILTERS 100
+#define GENERAL_GAIN 1
 
 using namespace std;
 
 #define REAL 0
 #define IMAG 1
 
-float GAIN_PER_FREQUENCY[] = {4, 3, 2, 1, 1, 1};
+float GAIN_PER_FREQUENCY[] = {2, 2, 2, 1, 1, 1};
+//float SMOOTHING_COEFFICIENT_PER_FREQ[] = {0.8, 0.78, 0.76, 0.74, 0.7, 0.65};
+float SMOOTHING_COEFFICIENT_PER_FREQ[] = {0.8, 0.5, 0.4, 0.3, 0.2, 0.2};
+
 float sampleFreq = NUM_POINTS / SAMPLE_DURATION;
 float scaledFreqBand[6];
 float unprocessedMagnitudes[NUM_POINTS/2];
@@ -77,17 +81,30 @@ void plotDifferentialBuffer()
    
     std::vector<std::pair<double, double> > xy_pts_A;
     for(int x=0; x< NUMBER_OF_FRAMES; x++) {
-        double y = alignedSumDifferentialBuffer[x];
+        double y = alignedSumDifferentialBuffer[x] -0.5;
         xy_pts_A.push_back(std::make_pair(x, y));
     }
     std::vector<std::pair<double, double> > xy_pts_B;
     for(int x=0; x< NUMBER_OF_FRAMES; x++) {
-        double y = alignedRollingDifferentialSumAverage[x];
+        double y = alignedRollingDifferentialSumAverage[x] - 0.5;
         xy_pts_B.push_back(std::make_pair(x, y));
     }
+
+    std::vector<std::pair<float, float> > xy_pts_C;
+    float barwidth = NUMBER_OF_FRAMES/8;
+    for(int i = 0; i < 6; i ++)
+    {
+        float y = magnitues[i][(magBufferIdx - 1 + NUMBER_OF_FRAMES)%NUMBER_OF_FRAMES];
+        xy_pts_C.push_back(std::make_pair((i * barwidth + barwidth/2.0), y  * 0.04 + 0.5));
+    }
+
+
     gp << "set xrange [0:" + to_string(NUMBER_OF_FRAMES) + "]\nset yrange [-1:3]\n";
    
-    gp << "plot" << gp.file1d(xy_pts_A) << "with lines title 'Sum differential',"  << gp.file1d(xy_pts_B) << "with lines title 'avg',"
+    gp << "plot" 
+    << gp.file1d(xy_pts_A) << "with lines title 'Sum differential',"  
+    << gp.file1d(xy_pts_B) << "with lines title 'avg'," 
+    << gp.file1d(xy_pts_C) << "with boxes title 'Amplitudes',"
         << std::endl;
 
 }
@@ -177,7 +194,7 @@ void findDominantFrequency()
     int dominantBin = 0;
     float dominantAmp = 0;
     std::system("clear");
-    for(int i = 4; i <  NUMBER_OF_FRAMES/10; i ++)
+    for(int i = 5; i <  NUMBER_OF_FRAMES/28; i ++)
     {
         float curAmp = sqrt(magDifferentialResults[i][REAL] * magDifferentialResults[i][REAL] + magDifferentialResults[i][IMAG] * magDifferentialResults[i][IMAG]);
         if(curAmp > dominantAmp){
@@ -186,7 +203,7 @@ void findDominantFrequency()
         }
 
         string out = to_string((float)i * diffFreqDelta  * 60);
-        for(int a = 0; a < curAmp ; a ++)
+        for(int a = 0; a < curAmp/3 ; a ++)
         {
             out = out + "#";
         }
@@ -219,16 +236,16 @@ void processResults(fftwf_complex* result)
     for(int i = 0; i < 6; i++)
     {
         
-        magnitues[i][magBufferIdx] = ( ( GAIN_PER_FREQUENCY[i] * scaledFreqBand[i] * 0.1) + (0.9 * magnitues[i][previousMagBuffer]));
+        magnitues[i][magBufferIdx] = ( ( GAIN_PER_FREQUENCY[i] * scaledFreqBand[i] * (1 - SMOOTHING_COEFFICIENT_PER_FREQ[i])) 
+        + (SMOOTHING_COEFFICIENT_PER_FREQ[i] * magnitues[i][previousMagBuffer]));
     }
 
     //now calculate the discrete derivative of the magnitudes(and apply a small rolling average to the signal)
     for(int i = 0; i < 6; i++)
     {
-        //float currentDifferential =  max(0.0f, magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - rollingAverage[i] - 1);
-        float currentDifferential =  magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - rollingAverage[i];
-        rollingAverage[i] = rollingAverage[i] * 0.997 + currentDifferential * 0.003;
-
+        float currentDifferential =  max(0.0f, magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - rollingAverage[i]);
+        //float currentDifferential =  magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - rollingAverage[i];
+        rollingAverage[i] = rollingAverage[i] * 0.998 + currentDifferential * 0.002;
         // magnitudeDifferentials[i][magBufferIdx] = magnitudeDifferentials[i][previousMagBuffer] * 0.005 + currentDifferential * 0.995 ;
         magnitudeDifferentials[i][magBufferIdx] = magnitudeDifferentials[i][previousMagBuffer] * 0.87 + currentDifferential * 0.13 ;
     }
@@ -237,7 +254,7 @@ void processResults(fftwf_complex* result)
     float differentialSum = 0;
     float averageSum = 0;
 
-    for(int a = 0; a < 6; a ++)
+    for(int a = 1; a < 2; a ++)
     {
         averageSum += rollingAverage[i];
         differentialSum+= magnitudeDifferentials[a][magBufferIdx];
@@ -263,6 +280,14 @@ void processResults(fftwf_complex* result)
 
 }
 
+void preprocessInputSignal(float* signal)
+{
+    for(int i = 0; i < NUM_POINTS ; i ++)
+    {
+        signal[i] = signal[i] * math::applyHanningFunction(i, NUM_POINTS) * GENERAL_GAIN;
+    }
+
+}
 
 int startMicRoutine()
 {
@@ -280,6 +305,7 @@ int startMicRoutine()
         if (!readCurrentBuffer(signal))
         {
             auto start = chrono::high_resolution_clock::now();
+            preprocessInputSignal(signal);
 
             fftwf_plan plan = fftwf_plan_dft_r2c_1d(NUM_POINTS,
                                             signal,

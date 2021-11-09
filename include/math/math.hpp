@@ -51,7 +51,6 @@ namespace math
         //800 - 1600
         //1600 - 3200
         //3200 - Rest
-        std::cout <<" freq delta scaled" << FREQUENCY_DELTA << std::endl;
 
 
 

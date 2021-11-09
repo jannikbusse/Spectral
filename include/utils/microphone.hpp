@@ -4,7 +4,7 @@
    #include <iostream>
    
    /* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
-   unsigned int SAMPLE_RATE = 44100;
+   unsigned int SAMPLE_RATE = 22050;
    unsigned int FRAMES_PER_BUFFER = 512;
 
    #define NUM_CHANNELS    (1)
@@ -107,7 +107,14 @@
    
        err = Pa_Initialize();
    
-       inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+       std::cout << Pa_GetDeviceCount() << std::endl;
+        for( i=0; i<Pa_GetDeviceCount(); i++ )
+        {
+           std::cout << Pa_GetDeviceInfo( i )->name << std::endl;
+	  std::cout << Pa_GetDeviceInfo(i) ->hostApi << std::endl;
+        }
+    
+       inputParameters.device = 11; /* default input device */
        if (inputParameters.device == paNoDevice) {
            fprintf(stderr,"Error: No default input device.\n");
        }

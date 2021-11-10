@@ -7,7 +7,7 @@
    unsigned int SAMPLE_RATE = 22050;
    unsigned int FRAMES_PER_BUFFER = 512;
 
-   #define NUM_CHANNELS    (1)
+   #define NUM_CHANNELS    (2)
    /* #define DITHER_FLAG     (paDitherOff) */
    #define DITHER_FLAG     (0) 
    
@@ -114,7 +114,7 @@
 	  std::cout << Pa_GetDeviceInfo(i) ->hostApi << std::endl;
         }
     
-       inputParameters.device = 11; /* default input device */
+       inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
        if (inputParameters.device == paNoDevice) {
            fprintf(stderr,"Error: No default input device.\n");
        }

@@ -20,7 +20,7 @@
 
 #define OUTPUT_ENABLED 1
 #define NUM_STORED_SIGNAL_FRAMES 3
-#define NUM_AUDIO_BUFFER_POINTS 256
+#define NUM_AUDIO_BUFFER_POINTS 512
 #define NUM_AUDIO_SAMPLE_DURATION 0.01
 #define NUM_POINTS (NUM_AUDIO_BUFFER_POINTS * NUM_STORED_SIGNAL_FRAMES)
 #define SAMPLE_DURATION (NUM_AUDIO_SAMPLE_DURATION * NUM_STORED_SIGNAL_FRAMES)
@@ -73,8 +73,6 @@ fftwf_complex result[NUM_POINTS];
 //------------------------------
 
 
-float loopFrequencyDelta = 1; //this value gets updated each loop. It is the frequency Delta
-float updatesPerSecond = 24; //number of updates of gnuplot per second
 float sampleFreq = NUM_POINTS / SAMPLE_DURATION;
 float frequencydelta  = sampleFreq / NUM_POINTS;
 
@@ -417,7 +415,7 @@ int releaseMusic()
 
 int update()
 {
-        Pa_Sleep(1);
+        cout << "hehe" << endl;
         if (!readCurrentBuffer(signal[currentSignalBuffer]))
         {
             //align the buffers

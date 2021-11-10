@@ -33,7 +33,7 @@ using namespace std;
 #define STRIP_TYPE              WS2811_STRIP_GRB		// WS2812/SK6812RGB integrated chip+leds
 //#define STRIP_TYPE            SK6812_STRIP_RGBW		// SK6812RGBW (NOT SK6812RGB)
 
-#define LED_COUNT                   15
+#define LED_COUNT                   150
 
 int led_count = LED_COUNT;
 
@@ -79,16 +79,13 @@ void basscallback()
 int main()
 {
 
-    // //ws2811_init(&ledstring);
-    // for(int i = 0; i < 5;i ++)
-    //     ledstring.channel[0].leds[i] = rgb2hex(0 ,i * 40, 255 - i * 50);
-    // cout << "test" << endl;
-    // ledstring.channel[0].leds[2] = rgb2hex(125,0,0);
-    // ledstring.channel[0].leds[3] = rgb2hex(0, 255, 0);
-    // ledstring.channel[0].leds[4] = rgb2hex(0,0 ,255);
-
+    // ws2811_init(&ledstring);
+    // for(int i = 0; i < 80;i ++)
+    //     ledstring.channel[0].leds[i] = rgb2hex(0,0,255);
     
-   // ws2811_render(&ledstring);
+//    ws2811_render(&ledstring);
+
+  //  return 0;
     
     init(&basscallback);  
     while(1)

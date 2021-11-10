@@ -98,6 +98,7 @@
    {
        SAMPLE_RATE = sample_rate;
        FRAMES_PER_BUFFER = buffer_size;
+       std::cout << SAMPLE_RATE << std::endl;
 
     bufferdata.maxFrameIndex = FRAMES_PER_BUFFER; /* Record for a few seconds. */
        bufferdata.frameIndex = 0;

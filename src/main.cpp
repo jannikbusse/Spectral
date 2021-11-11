@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <cstring>
 #include <thread>
-#include "ws2811/ws2811.h"
+//#include "ws2811/ws2811.h"
 
 #include <map>
 #include <vector>
@@ -39,36 +39,36 @@ int led_count = LED_COUNT;
 
 int clear_on_exit = 0;
 
-ws2811_t ledstring =
-{
-    .freq = TARGET_FREQ,
-    .dmanum = DMA,
-    .channel =
-    {
-        [0] =
-        {
-            .gpionum = GPIO_PIN,
-            .invert = 0,
-	    .count = LED_COUNT,
-	    .strip_type = STRIP_TYPE,
-            .brightness = 255,
-        },
-        [1] =
-        {
-            .gpionum = 0,
-            .invert = 0,
-            .count = 0,
-            .brightness = 0,
-        },
-    },
-};
+// ws2811_t ledstring =
+// {
+//     .freq = TARGET_FREQ,
+//     .dmanum = DMA,
+//     .channel =
+//     {
+//         [0] =
+//         {
+//             .gpionum = GPIO_PIN,
+//             .invert = 0,
+// 	    .count = LED_COUNT,
+// 	    .strip_type = STRIP_TYPE,
+//             .brightness = 255,
+//         },
+//         [1] =
+//         {
+//             .gpionum = 0,
+//             .invert = 0,
+//             .count = 0,
+//             .brightness = 0,
+//         },
+//     },
+// };
 
-//---------------
-uint32_t rgb2hex(uint8_t r, uint8_t g, uint8_t b)
-{
-    uint32_t res = b |g << 8 | r << 16 ;
-    return res;
-}
+// //---------------
+// uint32_t rgb2hex(uint8_t r, uint8_t g, uint8_t b)
+// {
+//     uint32_t res = b |g << 8 | r << 16 ;
+//     return res;
+// }
 
 void basscallback()
 {

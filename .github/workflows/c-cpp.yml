@@ -26,5 +26,5 @@ jobs:
       with:
         GITHUB_TOKEN: ${{ secrets.AUTHVER }}
         BRANCH: gh-pages # The branch the action should deploy to.
-        FOLDER: docs/html # The folder the action should deploy. 
+        FOLDER: doc/html # The folder the action should deploy. 
    

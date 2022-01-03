@@ -22,7 +22,7 @@ jobs:
     - name: run doxy      
       run: doxygen docs/config.in
     - name: Deploy 
-      uses: JamesIves/github-pages-deploy-action@releases/v3
+      uses: JamesIves/github-pages-deploy-action@4.1.5
       with:
         GITHUB_TOKEN: ${{ secrets.AUTHVER }}
         BRANCH: gh-pages # The branch the action should deploy to.

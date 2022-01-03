@@ -520,6 +520,6 @@ int update()
                 plotDifferentialBuffer();
         }
 
-    
+    return 0;
 }
 

@@ -5,6 +5,11 @@ void basscallback()
     cout << "bass detected" << endl;
 }
 
+/**
+ * @brief new comment
+ * 
+ * @return int 
+ */
 int main()
 {
     init(&basscallback);  

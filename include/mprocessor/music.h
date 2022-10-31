@@ -12,23 +12,22 @@
 #include <cstdint>
 #include <cstring>
 #include <thread>
-
-
+#include<unistd.h>
 #include <map>
 #include <vector>
 #include <cmath>
+#include "gnuplot-iostream.h"
+
+
+#define GNUPLOT_FRAMES 900
 
 #define OUTPUT_ENABLED 1
-#define NUM_STORED_SIGNAL_FRAMES 3
+#define NUM_STORED_SIGNAL_FRAMES 5
 #define NUM_AUDIO_BUFFER_POINTS 512
-#define NUM_AUDIO_SAMPLE_DURATION 0.01
+#define NUM_AUDIO_SAMPLE_DURATION 0.02
 #define NUM_POINTS (NUM_AUDIO_BUFFER_POINTS * NUM_STORED_SIGNAL_FRAMES)
 #define SAMPLE_DURATION (NUM_AUDIO_SAMPLE_DURATION * NUM_STORED_SIGNAL_FRAMES)
-#define NUMBER_OF_FRAMES 800
-#define MINIMAL_SIGNAL_THRESHOLD 0.1 //this is the threshold for the noise reduction
-#define NUMBER_OF_COMBFILTERS 150
-#define COMFILTER_INCREMENT 0.3
-#define COMBFILTER_START_BPM 60
+#define MINIMAL_SIGNAL_THRESHOLD 0.4 //this is the threshold for the noise reduction
 #define GENERAL_GAIN 4.6
 
 using namespace std;
@@ -36,38 +35,15 @@ using namespace std;
 #define REAL 0
 #define IMAG 1
 
-float GAIN_PER_FREQUENCY[] = {1.5, 1.5, 1, 1, 0.7, 0.7};
-float SMOOTHING_COEFFICIENT_PER_FREQ[] = {0.74, 0.74, 0.74, 0.74, 0.74, 0.74};
-float SMOOTHING_COEFFICIENT_PER_FREQ_DIFF[] = {0.65, 0.65, 0.65, 0.65, 0.7, 0.7};
-
 
 float scaledFreqBand[6]; //this are the 6 frequency bands that are used after the first processing steps
+
 float unprocessedMagnitudes[NUM_POINTS/2]; 
-float magnitues[6][NUMBER_OF_FRAMES]; //this are the magnitudes over time
-float magnitudeDifferentials[6][NUMBER_OF_FRAMES]; //this are the differentials over time
-
-float alignedSumDifferentialBuffer[NUMBER_OF_FRAMES]; //this is the plotting buffer fo the ringbufferdifferentialovertime
-float ringBufferDifferentialOverTime[NUMBER_OF_FRAMES]; // this stores the summed up differential over time only for plotting
-
-float rollingAverage[6];
-float alignedRollingDifferentialSumAverage[NUMBER_OF_FRAMES]; // this buffer is only for plotting. Old Averages have to be kept over time. This is the buffer that gets aligned
-float rollingDifferentialSumAverage[NUMBER_OF_FRAMES]; //this buffer is only for plotting. Old Averages have to be kept over time
-
-float combFilterbank[6][NUMBER_OF_COMBFILTERS][NUMBER_OF_FRAMES]; //this buffers stores the summed up energy of each comb filter for each frame
-float combFilterEnergySum[NUMBER_OF_COMBFILTERS];
-int combFilterPeakBin[6];
-float alignedCombFilterONEBANDONLY[NUMBER_OF_FRAMES];//ONLY FOR PLOTTING
-
-int voteHistory[NUMBER_OF_FRAMES];
-int voteCounter[NUMBER_OF_COMBFILTERS];
-
-
-bool onsetsDetected[3]; //bass high and one for later
-
 
 //fft signal and result buffers
 float signal[NUM_STORED_SIGNAL_FRAMES][NUM_AUDIO_BUFFER_POINTS];
 float alignedSignalBuffer[NUM_POINTS];
+float avrgFreqMagn[NUM_POINTS/2];
 int currentSignalBuffer = 0;
 fftwf_complex result[NUM_POINTS];
 //------------------------------
@@ -76,39 +52,57 @@ fftwf_complex result[NUM_POINTS];
 float sampleFreq = NUM_POINTS / SAMPLE_DURATION;
 float frequencydelta  = sampleFreq / NUM_POINTS;
 
-fftwf_complex magDifferentialResults[NUMBER_OF_FRAMES];
-
-//the buffer index for the ringbuffers
-int magBufferIdx = 0;
-//just and counter that counted how often there were not enough audiosamples when accessed. It is no longer required.
-
+float longBassAvrg = 0;
+float shortBassAvrg = 0;
+float bassEnergy = 0;
+float bassDiff = 0;
+float highEnergy = 0;
+float shortHighAvg = 0;
+float longHighAvg = 0;
+float newsum = 0;
+float totalsum = 0;
+float avgSmoothedSum = 0;
+float unsmoothed = 0;
 float currentVolume = 0;
 
-int peakBin = 0;
-int votedPeakBin = 0;
-
-void (*bassOnsetCallback)(void);
-
+const int NUM_PLOTS = 3;
+std::vector<std::pair<double, double> > xy_plotpoints[NUM_PLOTS];
+float gnuPoints[NUM_PLOTS][GNUPLOT_FRAMES];
+int skipFrames = 3;
+int curFrame = 0;
 
 static const auto& cout_alias = system("pkill -f gnu");
+Gnuplot gp, gp2;
 
-
-/**
- * @brief This method can be used to generate debug signals. Otherwise it has no purpose
- * 
- * @param signal the signal buffer
- */
-void acquire_from_somewhere(float* signal) {
-
-    int i;
-    for (i = 0; i < NUM_POINTS; i++) {
-        float theta = ((float)i / (float)NUM_POINTS) * SAMPLE_DURATION;
-        signal[i] = 1.0 * cos(510.0 * 2*M_PI * theta) +  2.0 * cos(300.0 * 2*M_PI * theta );
+void plotGnu()
+{   
+    for(int i = 0; i < NUM_PLOTS; i++)
+        xy_plotpoints[i].clear();
+    //GNULOGIC
+    //align buffer 
+    for(int i = 0; i < NUM_PLOTS; i++)
+        memmove(gnuPoints[i],gnuPoints[i]+1,sizeof(float)*(GNUPLOT_FRAMES-1));
+    gnuPoints[0][GNUPLOT_FRAMES -1] = totalsum;
+    gnuPoints[1][GNUPLOT_FRAMES -1]= newsum;
+    gnuPoints[2][GNUPLOT_FRAMES -1]= avgSmoothedSum;
+    cout <<currentVolume << endl;
+    for(int x=0; x< GNUPLOT_FRAMES; x++) {
+        for(int i=0; i < NUM_PLOTS; i++){
+            double y = gnuPoints[i][x];
+            xy_plotpoints[i].push_back(std::make_pair(x, y));
+        }
     }
+    gp << "plot"  
+    << gp.file1d(xy_plotpoints[0]) << "with lines title 'Sum differential',"  
+    //<< gp.file1d(xy_plotpoints[1]) << "with lines title 'Sum NotSmooth',"  
+    << gp.file1d(xy_plotpoints[2]) << "with lines title 'Sum RolAvg',"  
+    << std::endl;
 }
 
-
-
+int init()
+{
+    return initMicrophone(sampleFreq, NUM_AUDIO_BUFFER_POINTS);
+}
 
 void suppressNoiseAmp(float* signal)
 {
@@ -124,242 +118,72 @@ void suppressNoiseAmp(float* signal)
     }
 }
 
-
-void alignMagnitudeRingBuffers()
+float calculateVolume(float* signal)
 {
-    for(int i = 0; i < NUMBER_OF_FRAMES; i ++)
+    float sum = 0;
+    for(int i = 0; i < NUM_POINTS;i++ )
     {
-        alignedSumDifferentialBuffer[i] = ringBufferDifferentialOverTime[(i + magBufferIdx) % NUMBER_OF_FRAMES];
-        alignedRollingDifferentialSumAverage[i] = rollingDifferentialSumAverage[(i + magBufferIdx) % NUMBER_OF_FRAMES];
-        alignedCombFilterONEBANDONLY[i] = combFilterbank[4][0][(i + magBufferIdx) % NUMBER_OF_FRAMES];
-         
+        sum += signal[i] * signal[i];
     }
+    return sqrt(sum);
 }
 
-void clearCombFilterEnergySum()
+float RSME_smooth(float newVal, float oldVal, float newWeight)
 {
-    for(int i = 0; i < NUMBER_OF_COMBFILTERS; i++)
-    {
-        combFilterEnergySum[i] = 0;
-    }
+    return sqrt((newVal * newVal * newWeight + oldVal *  oldVal *(1-newWeight)));
 }
-
-int findPeakBin()
-{   
-    int bin = 0;
-    float peakMax = 0;
-    for(int i = 0; i < NUMBER_OF_COMBFILTERS; i++)
-    {
-        if(peakMax < combFilterEnergySum[i])
-        {
-            peakMax = combFilterEnergySum[i];
-            bin = i;
-        }
-    }   
-    return bin;
-}
-
-int voteLogic()
+float ROLAVG_smooth(float newVal, float oldVal, float newWeight)
 {
-    //remove old vote
-    voteCounter[voteHistory[magBufferIdx]] --;
-    //add new vote
-    voteCounter[peakBin] ++;
-    voteHistory[magBufferIdx] = peakBin;
-
-    //find overall Winner
-    int maxCount = 0;
-    int maxBin = 0;
-    for(int i = 0; i < NUMBER_OF_COMBFILTERS; i ++)
-    {
-        if(voteCounter[i] > maxCount)
-        {
-            maxCount = voteCounter[i];
-            maxBin = i;
-        }
-    }
-
-    votedPeakBin = maxBin;
-    return maxBin;
+    return newVal * newWeight +  oldVal *(1-newWeight);
 }
-
-float getCombFilterRecursive(float currentOffset, float generalOffset, int band)
-{
-    if(currentOffset > NUMBER_OF_FRAMES)
-        return 0;
-    
-    int magIndexWithOffsetBottom = (magBufferIdx - (int)(currentOffset) + NUMBER_OF_FRAMES)%NUMBER_OF_FRAMES;
-    int magIndexWithOffsetTop = (magBufferIdx - (int)(currentOffset) + 1 + NUMBER_OF_FRAMES)%NUMBER_OF_FRAMES;
-    float residue = currentOffset - (int)currentOffset;
-
-    float interpolMagDiffValue = magnitudeDifferentials[band][magIndexWithOffsetBottom] * (1 - residue) + magnitudeDifferentials[band][magIndexWithOffsetTop] * (residue);
-
-    float alpha = pow(0.5, (float)currentOffset/(float)generalOffset);
-    return (1-alpha)* interpolMagDiffValue + alpha*getCombFilterRecursive(currentOffset + generalOffset, generalOffset, band);
-}
-
-void applyCombFilterToFrequencyBand(int bandId)
-{
-    //apply comb filters
-    //the comb filter with delay T: y_t = alpha * y_(t-T) + ( 1 - alpha ) * x_t 
-
-    float delay_bpm = COMBFILTER_START_BPM; //in bpm
-    float delay_steps_bpm = COMFILTER_INCREMENT;
-    float alpha = 0;
-    float numberOfTimeSteps = 0;    
-
-    float combMaxEnergy = 0;
-    int combBin = 0;
-
-    for(int i = 0; i < NUMBER_OF_COMBFILTERS; i++)
-    {
-        delay_bpm = COMBFILTER_START_BPM + ( i * delay_steps_bpm );
-        float delay_in_seconds = 60.0/delay_bpm;
-
-        numberOfTimeSteps = delay_in_seconds/NUM_AUDIO_SAMPLE_DURATION;
-        combFilterbank[bandId][i][magBufferIdx] = getCombFilterRecursive(0, numberOfTimeSteps, bandId);
-        float energysum = 0;
-        
-        for(int a = 0; a < NUMBER_OF_FRAMES; a++)
-        {
-            energysum += combFilterbank[bandId][i][a]*combFilterbank[bandId][i][a];
-        }
-        combFilterEnergySum[i] += energysum;
-        combFilterPeakBin[bandId] = combBin; 
-        if(energysum > combMaxEnergy)
-        {
-            combMaxEnergy = energysum;
-            combBin = i;
-        }
-            
-    }
-    cout << "Peak bin for band" <<  bandId << " : " <<combFilterPeakBin[bandId] << "with " << (combFilterPeakBin[bandId] * delay_steps_bpm + COMBFILTER_START_BPM) 
-     << " and energy peak at " << combMaxEnergy<<endl;
-
-
-}
-
-
-void findDominantFrequency()
-{
-    for(int i = 0; i < NUMBER_OF_FRAMES; i ++)
-    {
-        alignedSumDifferentialBuffer[i] = ringBufferDifferentialOverTime[(i + magBufferIdx) % NUMBER_OF_FRAMES];
-        alignedRollingDifferentialSumAverage[i] = rollingDifferentialSumAverage[(i + magBufferIdx) % NUMBER_OF_FRAMES];
-
-       //alignedSumDifferentialBuffer[i] *= math::applyHanningFunction(i, NUMBER_OF_FRAMES);
-
-    }
-    fftwf_plan plan = fftwf_plan_dft_r2c_1d( NUMBER_OF_FRAMES,
-                                            alignedSumDifferentialBuffer,
-                                            magDifferentialResults,
-                                            0);
-
-    //acquire_from_somewhere(signal);
-    fftwf_execute(plan);
-
-
-    //now find the dominant frequency!!
-    float diffFreqDelta = (1/NUM_AUDIO_SAMPLE_DURATION) / (NUMBER_OF_FRAMES);
-
-    int dominantBin = 0;
-    float dominantAmp = 0;
-    std::system("clear");
-    for(int i = 60; i <  90; i ++)
-    {
-        float curAmp = sqrt(magDifferentialResults[i][REAL] * magDifferentialResults[i][REAL] + magDifferentialResults[i][IMAG] * magDifferentialResults[i][IMAG]);
-        if(curAmp > dominantAmp){
-            dominantAmp = curAmp;
-            dominantBin = i;
-        }
-
-        string out = to_string((float)i * diffFreqDelta  * 60);
-        for(int a = 0; a < curAmp/3 ; a ++)
-        {
-            out = out + "#";
-        }
-        //cout << out << endl;
-    }
-    //cout << "dominant frequency " << ((float)dominantBin * diffFreqDelta * 60.0) << endl;
-    //cout << "time window length:" << NUMBER_OF_FRAMES * NUM_AUDIO_SAMPLE_DURATION << endl;
-
-    fftwf_destroy_plan(plan);
-
-}
-
 
 
 void processResults(fftwf_complex* result)
 {
-    //std::system("clear");
-    //first compute the magnitudes
-    for(int i = 0; i < NUM_POINTS/2; i++)
+    printf("\033c");
+    newsum = 0;
+    for(int i = 1; i < NUM_POINTS/2; i++)
     {
         unprocessedMagnitudes[i] = (sqrt(result[i][REAL] * result[i][REAL] + result[i][IMAG] * result[i][IMAG]))/NUM_POINTS * 1000;
         
     }
-    //Now apply noise reduction to the unprocessed magnitudes
     suppressNoiseAmp(unprocessedMagnitudes);
-    //reduce the frequency bands to 6 channels
+
+   
+    float con = 0.99f;
+    for(int i = 1; i < NUM_POINTS/2; i++)
+    {
+
+        newsum += max(0.0f, unprocessedMagnitudes[i] - avrgFreqMagn[i]);
+        avrgFreqMagn[i] = avrgFreqMagn[i] * con + (1-con)*unprocessedMagnitudes[i];
+        
+    }
+    avgSmoothedSum = ROLAVG_smooth(newsum, totalsum, 0.3f);
+
+    totalsum = RSME_smooth(newsum, totalsum, 0.3f);
+    //totalsum = max(pow(totalsum,0.99f), max(0.0f, totalsum));
+
+
+
     math::getScaledFrequencyBands(unprocessedMagnitudes, scaledFreqBand, frequencydelta);
-    int previousMagBuffer = (magBufferIdx - 1 + NUMBER_OF_FRAMES)%NUMBER_OF_FRAMES;
-    //now apply some rolling average smoothing and store them in the buffer
-    for(int i = 0; i < 6; i++)
-    {
-        
-        magnitues[i][magBufferIdx] = ( ( GAIN_PER_FREQUENCY[i] * scaledFreqBand[i] * (1 - SMOOTHING_COEFFICIENT_PER_FREQ[i])) 
-        + (SMOOTHING_COEFFICIENT_PER_FREQ[i] * magnitues[i][previousMagBuffer]));
-    }
+    bassEnergy =  (scaledFreqBand[1] + scaledFreqBand[2]*0.8f);
+    highEnergy = (scaledFreqBand[2]*0.1f + scaledFreqBand[3] + scaledFreqBand[4]*1.5f + scaledFreqBand[5]);
+    bassDiff = max(pow(bassDiff,0.98f), max(0.0f, bassEnergy - shortBassAvrg));
 
-    //now calculate the discrete derivative of the magnitudes(and apply a small rolling average to the signal)
-    for(int i = 0; i < 6; i++)
-    {
-        float currentDifferential =  max(0.0f, magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - (rollingAverage[i] * 4) -2 );
-        //float currentDifferential =  magnitues[i][magBufferIdx] - magnitues[i][previousMagBuffer] - rollingAverage[i];
-        rollingAverage[i] = rollingAverage[i] * 0.999 + currentDifferential * 0.001;
-        // magnitudeDifferentials[i][magBufferIdx] = magnitudeDifferentials[i][previousMagBuffer] * 0.005 + currentDifferential * 0.995 ;
-        magnitudeDifferentials[i][magBufferIdx] =  currentDifferential* (1-SMOOTHING_COEFFICIENT_PER_FREQ_DIFF[i])
-             + magnitudeDifferentials[i][previousMagBuffer] * SMOOTHING_COEFFICIENT_PER_FREQ_DIFF[i] ;
-    }
-
-    //just for fun add up all current differentials
-    float differentialSum = 0;
-    float averageSum = 0;
-
-    for(int a = 0; a < 2; a ++)
-    {
-        averageSum += rollingAverage[a];
-        differentialSum+= magnitudeDifferentials[a][magBufferIdx];
-        
-    }
-    differentialSum /= 2;
-    string out = "Diff:";
-    for(int i = 0; i < (differentialSum  * 18) + 5; i ++)
-    {
-        out = out + "#";
-    }
+    float conLow = 0.495f;
+    longBassAvrg = bassEnergy * 0.01f + longBassAvrg*0.99f;
+    shortBassAvrg =sqrt(( bassEnergy *bassEnergy* (1.0f-conLow) + shortBassAvrg*shortBassAvrg*conLow)/2);
     
-    //cout << out << endl;
+    float conHigh = 0.999f;
+    longHighAvg = highEnergy * 0.001f + longHighAvg*0.99f;
+    shortHighAvg = highEnergy * (1.0f-conHigh) + shortHighAvg*conHigh;
 
-    rollingDifferentialSumAverage[magBufferIdx] = averageSum/2;
-    ringBufferDifferentialOverTime[magBufferIdx] = differentialSum;
+    float dstToAvg = max(0.0f,shortBassAvrg - longBassAvrg);
+
+    float intensity = (shortBassAvrg/longBassAvrg) + (shortHighAvg/longHighAvg);
     
-    alignMagnitudeRingBuffers();
-    // findDominantFrequency();
-    clearCombFilterEnergySum();
-     system("clear");
-    for(int i = 0; i < 5; i++)
-        applyCombFilterToFrequencyBand(i);
+    
 
-
-    int peakbin = findPeakBin();
-    peakBin = peakbin;
-    voteLogic();
-    cout << "frequencydelta "  << frequencydelta << endl;
-    cout << "time duration " << SAMPLE_DURATION << endl;
-
-    cout << "peak bin: " << peakbin << " at freq: " << (peakbin * COMFILTER_INCREMENT + COMBFILTER_START_BPM) << endl;
-    cout << "vote peak bin: " << votedPeakBin << " at freq: " << (votedPeakBin * COMFILTER_INCREMENT + COMBFILTER_START_BPM) << endl;
 
 }
 
@@ -373,39 +197,7 @@ void preprocessInputSignal(float* signal)
 }
 
 
-float calculateVolume(float* signal)
-{
-    float sum = 0;
-    for(int i = 0; i < NUM_POINTS;i++ )
-    {
-        sum += signal[i] * signal[i];
-    }
-    return sqrt(sum);
-}
 
-void handleCallbacks()
-{
-    float bassSum = magnitudeDifferentials[1][magBufferIdx] + magnitudeDifferentials[1][magBufferIdx];
-    float bassAvg = rollingAverage[1] + rollingAverage[1] ;
-    if(bassSum > 6*bassAvg)
-    {
-        if(!onsetsDetected[0]){
-            bassOnsetCallback();
-            onsetsDetected[0] = true;
-        }
-    }else
-    {
-        onsetsDetected[0] = false;
-    }
-
-
-}
-
-int init(void bassCallback(void))
-{
-    bassOnsetCallback = bassCallback;
-    return initMicrophone(sampleFreq, NUM_AUDIO_BUFFER_POINTS);
-}
 
 int releaseMusic()
 {
@@ -415,7 +207,6 @@ int releaseMusic()
 
 int update()
 {
-        cout << "hehe" << endl;
         if (!readCurrentBuffer(signal[currentSignalBuffer]))
         {
             //align the buffers
@@ -426,6 +217,7 @@ int update()
             }
 
             currentVolume = calculateVolume(alignedSignalBuffer);
+
             preprocessInputSignal(alignedSignalBuffer);
 
             fftwf_plan plan = fftwf_plan_dft_r2c_1d(NUM_POINTS,
@@ -436,7 +228,6 @@ int update()
             //acquire_from_somewhere(signal);
             fftwf_execute(plan);
             processResults(result);
-            handleCallbacks();
             fftwf_destroy_plan(plan);
 
   
@@ -445,11 +236,15 @@ int update()
             //if(OUTPUT_ENABLED)
                 // cout << "millisec per cycle"  << loopFrequencyDelta << endl;
                 // cout << "millisec per cycle"  << duration.count() << endl;
-            magBufferIdx = (magBufferIdx +1 ) % NUMBER_OF_FRAMES;
             currentSignalBuffer = (currentSignalBuffer + 1 ) %NUM_STORED_SIGNAL_FRAMES;
 
+        }else{
+            if(curFrame <= 0){
+                plotGnu();
+                curFrame = skipFrames;
+            }
+            curFrame --;
         }
-
-    
+    return 0;
 }
 

@@ -96,12 +96,12 @@
 
    int initMicrophone(unsigned int sample_rate = 44100, unsigned int buffer_size = 512)
    {
-       SAMPLE_RATE = sample_rate;
-       FRAMES_PER_BUFFER = buffer_size;
+        SAMPLE_RATE = sample_rate;
+        FRAMES_PER_BUFFER = buffer_size;
 
-    bufferdata.maxFrameIndex = FRAMES_PER_BUFFER; /* Record for a few seconds. */
-       bufferdata.frameIndex = 0;
-       bufferdata.recordedSamples = (SAMPLE *) malloc( FRAMES_PER_BUFFER * sizeof(SAMPLE)); /* From now on, recordedSamples is initialised. */
+        bufferdata.maxFrameIndex = FRAMES_PER_BUFFER; /* Record for a few seconds. */
+        bufferdata.frameIndex = 0;
+        bufferdata.recordedSamples = (SAMPLE *) malloc( FRAMES_PER_BUFFER * sizeof(SAMPLE)); /* From now on, recordedSamples is initialised. */
       
        for( i=0; i<numSamples; i++ ) bufferdata.recordedSamples[i] = 0;
    
@@ -110,8 +110,8 @@
        std::cout << Pa_GetDeviceCount() << std::endl;
         for( i=0; i<Pa_GetDeviceCount(); i++ )
         {
-           std::cout << Pa_GetDeviceInfo( i )->name << std::endl;
-	  std::cout << Pa_GetDeviceInfo(i) ->hostApi << std::endl;
+            std::cout << Pa_GetDeviceInfo( i )->name << std::endl;
+	        std::cout << Pa_GetDeviceInfo(i) ->hostApi << std::endl;
         }
     
        inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */

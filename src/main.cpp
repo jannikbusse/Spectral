@@ -87,7 +87,7 @@ int main()
 
   //  return 0;
     
-    init(&basscallback);  
+    init();  
     while(1)
         update();
 

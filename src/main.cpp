@@ -1,5 +1,6 @@
 
 #include <mprocessor/music.h>
+#include <utils/serial.hpp>
 
 #include <fftw3.h>
 #include <iostream>
@@ -78,14 +79,8 @@ void basscallback()
 
 int main()
 {
+    connectToArduino();
 
-    // ws2811_init(&ledstring);
-    // for(int i = 0; i < 80;i ++)
-    //     ledstring.channel[0].leds[i] = rgb2hex(0,0,255);
-    
-//    ws2811_render(&ledstring);
-
-  //  return 0;
     
     init();  
     while(1)

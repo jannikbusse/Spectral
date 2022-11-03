@@ -5,6 +5,7 @@
 #include <iostream>
 #include "../math/math.hpp"
 #include "../utils/microphone.hpp"
+#include "../utils/serial.hpp"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -65,7 +66,10 @@ float avgSmoothedSum = 0;
 float unsmoothed = 0;
 float currentVolume = 0;
 
-const int NUM_PLOTS = 3;
+sendStruct sendBuffer;
+
+
+const int NUM_PLOTS = 7;
 std::vector<std::pair<double, double> > xy_plotpoints[NUM_PLOTS];
 float gnuPoints[NUM_PLOTS][GNUPLOT_FRAMES];
 int skipFrames = 3;
@@ -82,9 +86,13 @@ void plotGnu()
     //align buffer 
     for(int i = 0; i < NUM_PLOTS; i++)
         memmove(gnuPoints[i],gnuPoints[i]+1,sizeof(float)*(GNUPLOT_FRAMES-1));
-    gnuPoints[0][GNUPLOT_FRAMES -1] = totalsum;
-    gnuPoints[1][GNUPLOT_FRAMES -1]= newsum;
-    gnuPoints[2][GNUPLOT_FRAMES -1]= avgSmoothedSum;
+    gnuPoints[0][GNUPLOT_FRAMES -1]= totalsum;
+    gnuPoints[1][GNUPLOT_FRAMES -1]= scaledFreqBand[0];
+    gnuPoints[2][GNUPLOT_FRAMES -1]= scaledFreqBand[1];
+    gnuPoints[3][GNUPLOT_FRAMES -1]= scaledFreqBand[2];
+    gnuPoints[4][GNUPLOT_FRAMES -1]= scaledFreqBand[3];
+    gnuPoints[5][GNUPLOT_FRAMES -1]= scaledFreqBand[4];
+    gnuPoints[6][GNUPLOT_FRAMES -1]= scaledFreqBand[5];
     cout <<currentVolume << endl;
     for(int x=0; x< GNUPLOT_FRAMES; x++) {
         for(int i=0; i < NUM_PLOTS; i++){
@@ -93,9 +101,13 @@ void plotGnu()
         }
     }
     gp << "plot"  
-    << gp.file1d(xy_plotpoints[0]) << "with lines title 'Sum differential',"  
-    //<< gp.file1d(xy_plotpoints[1]) << "with lines title 'Sum NotSmooth',"  
-    << gp.file1d(xy_plotpoints[2]) << "with lines title 'Sum RolAvg',"  
+   // << gp.file1d(xy_plotpoints[0]) << "with lines title 'Sum differential',"  
+    << gp.file1d(xy_plotpoints[1]) << "with lines title '0',"  
+    << gp.file1d(xy_plotpoints[2]) << "with lines title '1',"  
+    << gp.file1d(xy_plotpoints[3]) << "with lines title '2',"  
+    << gp.file1d(xy_plotpoints[4]) << "with lines title '3',"  
+    << gp.file1d(xy_plotpoints[5]) << "with lines title '4',"  
+    << gp.file1d(xy_plotpoints[6]) << "with lines title '5',"  
     << std::endl;
 }
 
@@ -149,7 +161,8 @@ void processResults(fftwf_complex* result)
     }
     suppressNoiseAmp(unprocessedMagnitudes);
 
-   
+    math::getScaledFrequencyBands(unprocessedMagnitudes, scaledFreqBand, frequencydelta);
+
     float con = 0.99f;
     for(int i = 1; i < NUM_POINTS/2; i++)
     {
@@ -160,29 +173,14 @@ void processResults(fftwf_complex* result)
     }
     avgSmoothedSum = ROLAVG_smooth(newsum, totalsum, 0.3f);
 
-    totalsum = RSME_smooth(newsum, totalsum, 0.3f);
+    totalsum = RSME_smooth(newsum, totalsum, 0.8f);
     //totalsum = max(pow(totalsum,0.99f), max(0.0f, totalsum));
 
-
-
-    math::getScaledFrequencyBands(unprocessedMagnitudes, scaledFreqBand, frequencydelta);
-    bassEnergy =  (scaledFreqBand[1] + scaledFreqBand[2]*0.8f);
-    highEnergy = (scaledFreqBand[2]*0.1f + scaledFreqBand[3] + scaledFreqBand[4]*1.5f + scaledFreqBand[5]);
-    bassDiff = max(pow(bassDiff,0.98f), max(0.0f, bassEnergy - shortBassAvrg));
-
-    float conLow = 0.495f;
-    longBassAvrg = bassEnergy * 0.01f + longBassAvrg*0.99f;
-    shortBassAvrg =sqrt(( bassEnergy *bassEnergy* (1.0f-conLow) + shortBassAvrg*shortBassAvrg*conLow)/2);
-    
-    float conHigh = 0.999f;
-    longHighAvg = highEnergy * 0.001f + longHighAvg*0.99f;
-    shortHighAvg = highEnergy * (1.0f-conHigh) + shortHighAvg*conHigh;
-
-    float dstToAvg = max(0.0f,shortBassAvrg - longBassAvrg);
-
-    float intensity = (shortBassAvrg/longBassAvrg) + (shortHighAvg/longHighAvg);
-    
-    
+    sendBuffer.vol = currentVolume;
+    sendBuffer.energychange = totalsum;
+    cout << "VOL " << currentVolume;
+    cout << "SUM " << totalsum;
+    //writeToArduino(sendBuffer);
 
 
 }
@@ -193,10 +191,7 @@ void preprocessInputSignal(float* signal)
     {
         signal[i] = signal[i] * math::applyHanningFunction(i, NUM_POINTS) * GENERAL_GAIN;
     }
-
 }
-
-
 
 
 int releaseMusic()
